@@ -32,6 +32,7 @@ logs/*
 !output/.gitkeep
 !logs/.gitkeep
 !resources/setup_conda_singularity.sh
+!resources/setup_conda_singularity_v2.sh
 
 # Ignorar por defecto todo en data
 data/*
