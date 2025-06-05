@@ -1,0 +1,21 @@
+name: epibac_mge
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10
+  - platon=1.7
+  - abricate=1.0.1
+  #- prokka=1.14.6
+  - islandpath=1.0.6
+  - integron_finder=2.0.6
+  - virsorter=2.2.4
+  - checkv=1.0.3
+  - pandas
+  - matplotlib
+  - jq
+  - parallel
+  - perl
+  - perl-bioperl
+  - perl-path-tiny

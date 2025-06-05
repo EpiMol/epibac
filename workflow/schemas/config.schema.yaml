@@ -54,15 +54,7 @@ properties:
 
   params:
     type: object
-    properties:
-      nanopore:
-        type: object
-        properties:
-          dorado_model:
-            type: string
-            enum: ["dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r9.4.1_450bps_hac@v3.3", "dna_r9.4.1_450bps_sup@v3.3"]
-            description: "Modelo de Dorado para muestras Nanopore"
-      
+    properties:   
       min_reads:
         type: integer
       fastp:

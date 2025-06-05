@@ -162,3 +162,118 @@ Regla base: setup_prokka_database
 Entorno: Docker/Singularity compatible
 """
             )
+
+rule setup_transposons_database:
+    """Configura la base de datos de transposones para abricate"""
+    input:
+        transposons_gz=f"{TRANSPOSONS_DB_DIR}/all_te.fasta.gz"
+    output:
+        transposons_fasta=f"{TRANSPOSONS_DB_DIR}/all_te.fasta",
+        flag=TRANSPOSONS_DB_FLAG,
+    log:
+        TRANSPOSONS_DB_LOG,
+    conda:
+        "../envs/epibac_mge.yml"
+    shell:
+        """
+        # Crear directorio para logs si no existe
+        mkdir -p $(dirname {log})
+        
+        echo "Configurando base de datos de transposones para abricate..." &> {log}
+        
+        # Verificar que el archivo comprimido existe
+        if [ ! -f {input.transposons_gz} ]; then
+            echo "[ERROR] No se encuentra el archivo comprimido: {input.transposons_gz}" >> {log}
+            exit 1
+        fi
+        
+        # Descomprimir el archivo si no existe la versión descomprimida
+        if [ ! -f {output.transposons_fasta} ]; then
+            echo "Descomprimiendo {input.transposons_gz}..." >> {log}
+            gunzip -c {input.transposons_gz} > {output.transposons_fasta}
+            
+            # Verificar que la descompresión fue correcta
+            if [ ! -f {output.transposons_fasta} ] || [ ! -s {output.transposons_fasta} ]; then
+                echo "[ERROR] Error al descomprimir el archivo de transposones" >> {log}
+                exit 1
+            fi
+            
+            echo "Archivo descomprimido correctamente" >> {log}
+        else
+            echo "El archivo {output.transposons_fasta} ya existe, omitiendo descompresión" >> {log}
+        fi
+        
+        # Obtener el directorio de abricate en el entorno conda
+        ABRICATE_DB_DIR=$(conda info --base)/envs/epibac_mge/db/transposons
+        
+        # Crear directorio para la base de datos de transposons
+        mkdir -p "$ABRICATE_DB_DIR"
+        
+        # Copiar archivo de secuencias descomprimido
+        cp {output.transposons_fasta} "$ABRICATE_DB_DIR/sequences"
+        
+        # Configurar abricate para que reconozca la nueva base de datos
+        abricate --setupdb >> {log} 2>&1
+        
+        # Verificar que la base de datos se configuró correctamente
+        if ! abricate --list | grep -q "transposons"; then
+            echo "[ERROR] La base de datos de transposons no se configuró correctamente" >> {log}
+            exit 1
+        fi
+        
+        echo "Base de datos de transposons configurada correctamente" >> {log}
+        abricate --list | grep transposons >> {log}
+        
+        # Crear directorio para el flag si no existe
+        mkdir -p {TRANSPOSONS_DB_DIR}
+        touch {output.flag}
+        """
+
+rule setup_platon_database:
+    """Descarga y configura la base de datos de Platon si no existe"""
+    output:
+        db_dir=directory(f"{PLATON_DB_DIR}/db"),
+        flag=PLATON_DB_FLAG,
+    log:
+        PLATON_DB_LOG,
+    conda:
+        "../envs/epibac_mge.yml"
+    resources:
+        mem_mb=2000,
+        walltime="00:30:00"
+    shell:
+        """
+        # Crear directorio para logs si no existe
+        mkdir -p $(dirname {log})
+        
+        # Verificar si la base de datos ya existe
+        if [ -d "{PLATON_DB_DIR}/db" ]; then
+            echo "Base de datos de Platon ya existe, creando flag..." &> {log}
+            touch {output.flag}
+            exit 0
+        fi
+        
+        echo "Descargando base de datos de Platon..." &> {log}
+        
+        # Crear directorio base
+        mkdir -p {PLATON_DB_DIR}
+        
+        # Descargar y extraer la base de datos
+        wget https://zenodo.org/record/4066768/files/db.tar.gz \
+          -O {PLATON_DB_DIR}/db.tar.gz >> {log} 2>&1
+        
+        tar -xzf {PLATON_DB_DIR}/db.tar.gz \
+          -C {PLATON_DB_DIR} >> {log} 2>&1
+        
+        # Limpiar archivo comprimido
+        rm -f {PLATON_DB_DIR}/db.tar.gz
+        
+        # Verificar que la base de datos se extrajo correctamente
+        if [ ! -d {output.db_dir} ]; then
+            echo "[ERROR] La base de datos de Platon no se pudo extraer correctamente" >> {log}
+            exit 1
+        fi
+        
+        echo "Base de datos de Platon configurada correctamente" >> {log}
+        touch {output.flag}
+        """

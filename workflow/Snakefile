@@ -84,6 +84,7 @@ include: os.path.join(WORKFLOW_DIR, "rules/qc.smk")
 include: os.path.join(WORKFLOW_DIR, "rules/assembly.smk")
 include: os.path.join(WORKFLOW_DIR, "rules/annotation.smk")
 include: os.path.join(WORKFLOW_DIR, "rules/amr_mlst.smk")
+include: os.path.join(WORKFLOW_DIR, "rules/mge.smk")
 include: os.path.join(WORKFLOW_DIR, "rules/report.smk")
 
 # Definir objetivo predeterminado

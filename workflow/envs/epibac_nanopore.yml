@@ -1,0 +1,16 @@
+name: epibac_nanopore
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  # Dorado for nanopore basecalling
+  - ont-dorado=0.7.0
+  # Additional utilities that might be needed
+  - pigz
+  - samtools
+  - gzip
+  # Python for any potential scripting
+  - python>=3.8
+  - numpy
+  - pandas

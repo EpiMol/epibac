@@ -195,20 +195,20 @@ def create_samplesinfo(args):
             if args.mode == "gva":
                 # Cabecera modo GVA
                 f.write(
-                    "CODIGO_MUESTRA_ORIGEN;PETICION;FECHA_TOMA_MUESTRA;ESPECIE_SECUENCIA;MOTIVO_WGS;NUM_BROTE;CONFIRMACION;COMENTARIO_WGS;ILLUMINA_R1;ILLUMINA_R2;NANOPORE\n"
+                    "CODIGO_MUESTRA_ORIGEN;PETICION;FECHA_TOMA_MUESTRA;ESPECIE_SECUENCIA;MOTIVO_WGS;NUM_BROTE;CONFIRMACION;COMENTARIO_WGS;ILLUMINA_R1;ILLUMINA_R2;NANOPORE;MODELO_DORADO\n"
                 )
 
                 # Datos de las muestras
                 for sample_id, reads in samples.items():
-                    f.write(f"{sample_id};;;;;;;" f";{reads['R1']};{reads['R2']};\n")
+                    f.write(f"{sample_id};;;;;;;" f";{reads['R1']};{reads['R2']};;\n")
 
             else:  # modo normal
                 # Cabecera modo normal
-                f.write("id;collection_date;organism;illumina_r1;illumina_r2;nanopore\n")
+                f.write("id;collection_date;organism;illumina_r1;illumina_r2;nanopore;dorado_model\n")
 
                 # Datos de las muestras
                 for sample_id, reads in samples.items():
-                    f.write(f"{sample_id};;;" f"{reads['R1']};{reads['R2']};\n")
+                    f.write(f"{sample_id};;;" f"{reads['R1']};{reads['R2']};;\n")
 
     else:  # nanopore
         # Para Nanopore, cada archivo es una muestra
@@ -222,20 +222,20 @@ def create_samplesinfo(args):
             if args.mode == "gva":
                 # Cabecera modo GVA
                 f.write(
-                    "CODIGO_MUESTRA_ORIGEN;PETICION;FECHA_TOMA_MUESTRA;ESPECIE_SECUENCIA;MOTIVO_WGS;NUM_BROTE;CONFIRMACION;COMENTARIO_WGS;ILLUMINA_R1;ILLUMINA_R2;NANOPORE\n"
+                    "CODIGO_MUESTRA_ORIGEN;PETICION;FECHA_TOMA_MUESTRA;ESPECIE_SECUENCIA;MOTIVO_WGS;NUM_BROTE;CONFIRMACION;COMENTARIO_WGS;ILLUMINA_R1;ILLUMINA_R2;NANOPORE;MODELO_DORADO\n"
                 )
 
                 # Datos de las muestras
                 for sample_id, fastq_path in sample_files.items():
-                    f.write(f"{sample_id};;;;;;;" f";;{fastq_path}\n")
+                    f.write(f"{sample_id};;;;;;;" f";;{fastq_path};\n")
 
             else:  # modo normal
                 # Cabecera modo normal
-                f.write("id;collection_date;organism;illumina_r1;illumina_r2;nanopore\n")
+                f.write("id;collection_date;organism;illumina_r1;illumina_r2;nanopore;dorado_model\n")
 
                 # Datos de las muestras
                 for sample_id, fastq_path in sample_files.items():
-                    f.write(f"{sample_id};;;" f";;{fastq_path}\n")
+                    f.write(f"{sample_id};;;" f";;{fastq_path};\n")
 
     print(f"Archivo samplesinfo creado exitosamente: {output_file}")
     print(
