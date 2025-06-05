@@ -25,6 +25,9 @@ properties:
   nanopore:
     type: [string, null]
     description: "Ruta al archivo FASTQ de Oxford Nanopore"
+  dorado_model:
+    type: [string, null]
+    description: "Modelo específico de Dorado para esta muestra (opcional, sobrescribe el modelo global)"
   outbreak_id:
     type: [string, null]
     description: "Identificador de brote (solo en modo GVA)"

@@ -89,7 +89,7 @@ rule epibac_resfinder:
 
 rule epibac_mlst:
     input:
-        lambda wc: f"{OUTDIR}/assembly/{wc.sample}/{wc.sample}.fasta",
+        assembly = lambda wc: f"{OUTDIR}/assembly/{wc.sample}/{wc.sample}.fasta",
     output:
         tsv="{}/amr_mlst/{{sample}}_mlst.tsv".format(OUTDIR),
     log:
@@ -104,6 +104,8 @@ rule epibac_mlst:
         walltime=get_resource("mlst", "walltime"),
     params:
         name=lambda wc: f"{wc.sample}",
+        blastdb_path=f"{MLST_DB_DIR}/blast/mlst.fa",
+        datadir_path=MLST_DB_DIR,
     shell:
         """
         if [[ -n "${{CONDA_PREFIX:-}}" ]]; then
@@ -115,8 +117,8 @@ rule epibac_mlst:
         fi
     
         # Verifica si el archivo FASTA es vacío o no
-        if [[ ! -s {input} ]]; then
-            echo "[ERROR] El archivo FASTA {input} está vacío" &> {log}
+        if [[ ! -s {input.assembly} ]]; then
+            echo "[ERROR] El archivo FASTA {input.assembly} está vacío" &> {log}
             touch {output.tsv}
             exit 0
         fi
@@ -124,7 +126,9 @@ rule epibac_mlst:
         # Ejecutar MLST (igual para ambos entornos)
         mlst \
         --label {params.name} \
-        {input} \
+        --blastdb {params.blastdb_path} \
+        --datadir {params.datadir_path} \
+        {input.assembly} \
         > {output.tsv} \
         2> {log}
         """
