@@ -96,13 +96,27 @@ AMRFINDER_DB_LOG = f"{REFDIR}/databases/log/amrfinder.log"
 
 # ----- RESFINDER -----
 RESFINDER_DB_DIR = f"{REFDIR}/databases/resfinder"
-RESFINDER_DB_FLAG = f"{REFDIR}/databases/resfinder/.installed.flag"
+RESFINDER_DB_FLAG = f"{RESFINDER_DB_DIR}/.installed.flag"
 RESFINDER_DB_LOG = f"{REFDIR}/databases/log/resfinder.log"
 
 # ----- PROKKA -----
 PROKKA_DB_DIR = f"{REFDIR}/databases/prokka"
 PROKKA_DB_FLAG = f"{PROKKA_DB_DIR}/.installed.flag"
 PROKKA_DB_LOG = f"{REFDIR}/databases/log/prokka.log"
+
+# ----- ABRICATE -----
+TRANSPOSONS_DB_DIR = f"{REFDIR}/databases/transposons"
+TRANSPOSONS_DB_FLAG = f"{TRANSPOSONS_DB_DIR}/.installed.flag"
+TRANSPOSONS_DB_LOG = f"{REFDIR}/databases/log/transposons.log"
+
+# ----- PLATON -----
+PLATON_DB_DIR = f"{REFDIR}/databases/platon"
+PLATON_DB_FLAG = f"{PLATON_DB_DIR}/.installed.flag"
+PLATON_DB_LOG = f"{REFDIR}/databases/log/platon.log"
+
+# ----- MLST -----
+MLST_DB_DIR = f"{REFDIR}/databases/mlst"
+
 
 # =================== FUNCIONES DE ACCESO A DATOS DE MUESTRAS =================== #
 
@@ -201,16 +215,86 @@ def get_filtered_samples():
     return validated_samples
 
 
+def get_dorado_model(wildcards):
+    """
+    Obtiene el modelo Dorado para una muestra específica.
+    
+    Args:
+        wildcards: Wildcards de Snakemake con el nombre de la muestra.
+    
+    Returns:
+        str: Modelo Dorado a usar para esta muestra.
+    
+    Raises:
+        ValueError: Si no se encuentra un modelo válido.
+    """
+    samples = get_samples()
+    sample_row = samples.loc[wildcards.sample]
+    
+    # Verificar si la muestra tiene columna dorado_model y un valor específico
+    if "dorado_model" in samples.columns and pd.notna(sample_row.get("dorado_model")) and str(sample_row.get("dorado_model")).strip():
+        return str(sample_row.get("dorado_model")).strip()
+    
+    # Usar modelo global del config.yaml
+    global_model = config.get("params", {}).get("nanopore", {}).get("dorado_model", None)
+    if global_model:
+        return global_model
+    
+    # Si no hay modelo disponible, lanzar error
+    raise ValueError(f"No se encontró modelo Dorado para la muestra {wildcards.sample}")
+
+
+def has_nanopore_data(wildcards):
+    """
+    Verifica si una muestra tiene datos de nanopore.
+    
+    Args:
+        wildcards: Wildcards de Snakemake con el nombre de la muestra.
+    
+    Returns:
+        bool: True si la muestra tiene datos de nanopore.
+    """
+    samples = get_samples()
+    sample_row = samples.loc[wildcards.sample]
+    
+    nanopore_path = sample_row.get("nanopore")
+    return pd.notna(nanopore_path) and str(nanopore_path).strip() != ""
+
+
+def get_nanopore_fastq(wildcards):
+    """
+    Obtiene la ruta del archivo FASTQ de nanopore para una muestra.
+    
+    Args:
+        wildcards: Wildcards de Snakemake con el nombre de la muestra.
+    
+    Returns:
+        str: Ruta al archivo FASTQ de nanopore.
+    
+    Raises:
+        ValueError: Si no se encuentran archivos nanopore válidos.
+    """
+    samples = get_samples()
+    sample_row = samples.loc[wildcards.sample]
+    
+    nanopore_path = sample_row.get("nanopore")
+    if pd.notna(nanopore_path) and str(nanopore_path).strip():
+        return str(nanopore_path).strip()
+    else:
+        raise ValueError(f"No se encontró archivo nanopore para la muestra {wildcards.sample}")
+
+
 # =================== UTILIDADES GENERALES =================== #
 
 
-def get_resource(rule, resource):
+def get_resource(rule, resource, default=None):
     """
     Obtiene un recurso para una regla específica, con fallback a los valores por defecto.
 
     Args:
         rule: Nombre de la regla.
-        resource: Tipo de recurso (threads, mem, walltime).
+        resource: Tipo de recurso (threads, mem, walltime, gpu).
+        default: Valor por defecto a usar si no se encuentra en la configuración.
 
     Returns:
         Valor del recurso.
@@ -218,7 +302,12 @@ def get_resource(rule, resource):
     try:
         return config["resources"][rule][resource]
     except KeyError:
-        return config["resources"]["default"][resource]
+        try:
+            return config["resources"]["default"][resource]
+        except KeyError:
+            if default is not None:
+                return default
+            raise ValueError(f"No se encontró el recurso '{resource}' para la regla '{rule}' y no se proporcionó valor por defecto")
 
 
 def sanitize_id(x):
@@ -248,13 +337,37 @@ def get_all_inputs():
         f"{OUTDIR}/report/{TAG_RUN}_EPIBAC.xlsx",
     ]
 
+    # Expandir archivos de platon para todas las muestras
+    sample_ids = get_sample_index_if_exists()
+    if sample_ids:
+        inputs.extend([
+            f"{OUTDIR}/mge_analysis/plasmids/platon/{sample}/{sample}.tsv"
+            for sample in sample_ids
+        ])
+        inputs.extend([
+            f"{OUTDIR}/mge_analysis/plasmids/mob_suite/{sample}/mobtyper_results.txt"
+            for sample in sample_ids
+        ])
+        inputs.extend([
+             f"{OUTDIR}/mge_analysis/transposons/{sample}_abricate.tsv"
+            for sample in sample_ids
+        ])
+        
+        # Agregar análisis unificado de plásmidos
+        inputs.extend([
+            f"{OUTDIR}/mge_analysis/unified_plasmid_analysis/{TAG_RUN}_plasmid_analysis_summary.tsv",
+            f"{OUTDIR}/mge_analysis/unified_plasmid_analysis/{TAG_RUN}_Reporte_Plasmidos_Simplificado.xlsx"
+        ])      
+       
+
     # Si no estamos omitiendo Prokka, añadimos su metadata
     if not should_skip("prokka"):
         inputs.append(f"{REFDIR}/databases/prokka/VERSION.txt")
 
     # Si estamos en modo GVA, añadimos también el reporte para GESTLAB
     if config.get("mode") == "gva":
-        inputs.append(f"{OUTDIR}/report/{TAG_RUN}_EPIBAC_GESTLAB.csv"),
+        inputs.append(f"{OUTDIR}/report/{TAG_RUN}_EPIBAC_GESTLAB.csv")
+        inputs.append(f"{OUTDIR}/report/{TAG_RUN}_EPIBAC_GESTLAB.xlsx")
         inputs.append(f"{OUTDIR}/report/{TAG_RUN}_file_copy_log.txt")
 
     return inputs

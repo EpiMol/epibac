@@ -139,6 +139,7 @@ def validate_samples(samples_file, config, mode=None, verbose=False):
             "ILLUMINA_R1": "illumina_r1",
             "ILLUMINA_R2": "illumina_r2",
             "NANOPORE": "nanopore",
+            "MODELO_DORADO": "dorado_model",
             "ID_WS": "scheme_mlst",
             "ST_WGS": "st",
             "MLST_WGS": "mlst",
@@ -270,18 +271,46 @@ def validate_samples(samples_file, config, mode=None, verbose=False):
         has_nanopore = True
 
     if has_nanopore:
-        dorado_model = config.get("params", {}).get("nanopore", {}).get("dorado_model", None)
-        if not dorado_model:
-            errors.append("Nanopore samples detected but dorado_model not specified in config.yaml")
-        else:
-            valid_models = [
-                "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
-                "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
-                "dna_r9.4.1_450bps_hac@v3.3",
-                "dna_r9.4.1_450bps_sup@v3.3",
-            ]
-            if dorado_model not in valid_models:
-                errors.append(f"Invalid Dorado model '{dorado_model}'. It must be one of: {', '.join(valid_models)}")
+        # Get global dorado_model from config
+        global_dorado_model = config.get("params", {}).get("nanopore", {}).get("dorado_model", None)
+        
+        # Valid Dorado models
+        valid_models = [
+            "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+            "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+            "dna_r9.4.1_450bps_hac@v3.3",
+            "dna_r9.4.1_450bps_sup@v3.3",
+            "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
+            "dna_r9.4.1_450bps_sup@v3.6.0",
+            "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+            "dna_r9.4.1_450bps_hac@v3.6.0",
+        ]
+        
+        # Check if we have per-sample dorado_model column
+        has_sample_models = "dorado_model" in validated_df.columns
+        
+        # Validate dorado models for each nanopore sample
+        for i, row in validated_df.iterrows():
+            if pd.notna(row.get("nanopore")) and str(row.get("nanopore")).strip() != '':
+                # This sample has nanopore data
+                sample_model = None
+                
+                if has_sample_models and pd.notna(row.get("dorado_model")) and str(row.get("dorado_model")).strip() != '':
+                    # Use sample-specific model
+                    sample_model = str(row.get("dorado_model")).strip()
+                elif global_dorado_model:
+                    # Use global model
+                    sample_model = global_dorado_model
+                
+                # Validate the model
+                if not sample_model:
+                    errors.append(f"Row {i+2}: Nanopore sample detected but no dorado_model specified (neither in sample nor in config.yaml)")
+                elif sample_model not in valid_models:
+                    errors.append(f"Row {i+2}: Invalid Dorado model '{sample_model}'. It must be one of: {', '.join(valid_models)}")
+        
+        # If no global model and no sample-specific models, warn
+        if not global_dorado_model and not has_sample_models:
+            errors.append("Nanopore samples detected but no dorado_model specified in config.yaml and no MODELO_DORADO column in samplesheet")
 
     # Determine final status
     status = 0  # By default, everything is OK

@@ -1,8 +1,0 @@
-name: epibac_tetyper
-channels:
-  - bioconda
-  - conda-forge
-  - defaults
-dependencies:
-  - python=2.7
-  - tetyper=1.1
