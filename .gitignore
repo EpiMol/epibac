@@ -20,6 +20,9 @@
 !logs/
 !resources/databases/mlst/ 
 !resources/databases/mlst/**/*
+!resources/databases/transposons/
+!resources/databases/transposons/all_te.fasta.gz
+
 # Ignored because it contains its own Git repository, which causes conflicts if added directly
 resources/databases/resfinder/
 
