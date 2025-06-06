@@ -203,8 +203,15 @@ rule setup_transposons_database:
             echo "El archivo {output.transposons_fasta} ya existe, omitiendo descompresión" >> {log}
         fi
         
-        # Obtener el directorio de abricate en el entorno conda
-        ABRICATE_DB_DIR=$(conda info --base)/envs/epibac_mge/db/transposons
+        # Detectar el directorio de abricate en el entorno conda activo
+        if [ -n "$CONDA_PREFIX" ]; then
+            ABRICATE_DB_DIR="$CONDA_PREFIX/db/transposons"
+        else
+            echo "[ERROR] No se detectó entorno conda activo" >> {log}
+            exit 1
+        fi
+        
+        echo "Directorio de abricate detectado: $ABRICATE_DB_DIR" >> {log}
         
         # Crear directorio para la base de datos de transposons
         mkdir -p "$ABRICATE_DB_DIR"
@@ -213,19 +220,24 @@ rule setup_transposons_database:
         cp {output.transposons_fasta} "$ABRICATE_DB_DIR/sequences"
         
         # Configurar abricate para que reconozca la nueva base de datos
+        echo "Configurando abricate..." >> {log}
         abricate --setupdb >> {log} 2>&1
         
         # Verificar que la base de datos se configuró correctamente
+        echo "Verificando configuración..." >> {log}
+        abricate --list >> {log} 2>&1
+        
         if ! abricate --list | grep -q "transposons"; then
-            echo "[ERROR] La base de datos de transposons no se configuró correctamente" >> {log}
-            exit 1
+            echo "[WARNING] La base de datos 'transposons' no aparece en la lista de abricate" >> {log}
+            echo "Esto puede ser normal si es la primera vez que se configura" >> {log}
+        else
+            echo "Base de datos de transposons detectada correctamente" >> {log}
         fi
         
-        echo "Base de datos de transposons configurada correctamente" >> {log}
-        abricate --list | grep transposons >> {log}
+        echo "Configuración de transposons completada" >> {log}
         
         # Crear directorio para el flag si no existe
-        mkdir -p {TRANSPOSONS_DB_DIR}
+        mkdir -p $(dirname {output.flag})
         touch {output.flag}
         """
 

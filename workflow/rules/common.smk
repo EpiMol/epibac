@@ -337,13 +337,37 @@ def get_all_inputs():
         f"{OUTDIR}/report/{TAG_RUN}_EPIBAC.xlsx",
     ]
 
+    # Expandir archivos de platon para todas las muestras
+    sample_ids = get_sample_index_if_exists()
+    if sample_ids:
+        inputs.extend([
+            f"{OUTDIR}/mge_analysis/plasmids/platon/{sample}/{sample}.tsv"
+            for sample in sample_ids
+        ])
+        inputs.extend([
+            f"{OUTDIR}/mge_analysis/plasmids/mob_suite/{sample}/mobtyper_results.txt"
+            for sample in sample_ids
+        ])
+        inputs.extend([
+             f"{OUTDIR}/mge_analysis/transposons/{sample}_abricate.tsv"
+            for sample in sample_ids
+        ])
+        
+        # Agregar análisis unificado de plásmidos
+        inputs.extend([
+            f"{OUTDIR}/mge_analysis/unified_plasmid_analysis/{TAG_RUN}_plasmid_analysis_summary.tsv",
+            f"{OUTDIR}/mge_analysis/unified_plasmid_analysis/{TAG_RUN}_Reporte_Plasmidos_Simplificado.xlsx"
+        ])      
+       
+
     # Si no estamos omitiendo Prokka, añadimos su metadata
     if not should_skip("prokka"):
         inputs.append(f"{REFDIR}/databases/prokka/VERSION.txt")
 
     # Si estamos en modo GVA, añadimos también el reporte para GESTLAB
     if config.get("mode") == "gva":
-        inputs.append(f"{OUTDIR}/report/{TAG_RUN}_EPIBAC_GESTLAB.csv"),
+        inputs.append(f"{OUTDIR}/report/{TAG_RUN}_EPIBAC_GESTLAB.csv")
+        inputs.append(f"{OUTDIR}/report/{TAG_RUN}_EPIBAC_GESTLAB.xlsx")
         inputs.append(f"{OUTDIR}/report/{TAG_RUN}_file_copy_log.txt")
 
     return inputs
