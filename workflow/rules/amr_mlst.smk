@@ -125,6 +125,7 @@ rule epibac_mlst:
 
         # Ejecutar MLST (igual para ambos entornos)
         mlst \
+        --exclude "ecoli" \
         --label {params.name} \
         --blastdb {params.blastdb_path} \
         --datadir {params.datadir_path} \

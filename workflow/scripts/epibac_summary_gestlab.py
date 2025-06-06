@@ -26,36 +26,29 @@ def setup_logging():
 
 
 def get_species_conversion_dict():
-    """Diccionario para convertir nombres de especies abreviados a nombres completos."""
+    """Convierte nombres de carpetas abreviados a nombres de especie completos."""
     return {
         'abaumannii': 'Acinetobacter baumannii',
-        'acinetobacter_baumannii': 'Acinetobacter baumannii',
-        'ecoli': 'Escherichia coli',
-        'escherichia_coli': 'Escherichia coli',
-        'kpneumoniae': 'Klebsiella pneumoniae',
-        'klebsiella_pneumoniae': 'Klebsiella pneumoniae',
-        'senterica': 'Salmonella enterica',
-        'salmonella_enterica': 'Salmonella enterica',
-        'paeruginosa': 'Pseudomonas aeruginosa',
-        'pseudomonas_aeruginosa': 'Pseudomonas aeruginosa',
-        'saureus': 'Staphylococcus aureus',
-        'staphylococcus_aureus': 'Staphylococcus aureus',
-        'efaecium': 'Enterococcus faecium',
-        'enterococcus_faecium': 'Enterococcus faecium',
-        'efaecalis': 'Enterococcus faecalis',
-        'enterococcus_faecalis': 'Enterococcus faecalis',
-        'sagalactiae': 'Streptococcus agalactiae',
-        'streptococcus_agalactiae': 'Streptococcus agalactiae',
-        'spneumoniae': 'Streptococcus pneumoniae',
-        'streptococcus_pneumoniae': 'Streptococcus pneumoniae',
-        'spyogenes': 'Streptococcus pyogenes',
-        'streptococcus_pyogenes': 'Streptococcus pyogenes',
-        'lmonocytogenes': 'Listeria monocytogenes',
-        'listeria_monocytogenes': 'Listeria monocytogenes',
-        'campylobacter_jejuni': 'Campylobacter jejuni',
+        'citrobacter': 'Citrobacter sp.',
         'cjejuni': 'Campylobacter jejuni',
-        'campylobacter_coli': 'Campylobacter coli',
-        'ccoli': 'Campylobacter coli'
+        'ecoli': 'Escherichia coli',
+        'ecoli_achtman': 'Escherichia coli',
+        'koxytoca': 'Klebsiella oxytoca',
+        'kpneumoniae': 'Klebsiella pneumoniae',
+        'lpneumophila': 'Legionella pneumophila',
+        'neisseria': 'Neisseria sp.',
+        'pputida': 'Pseudomonas putida',
+        'saureus': 'Staphylococcus aureus',
+        'senterica': 'Salmonella enterica',
+        'smaltophilia': 'Stenotrophomonas maltophilia',
+        'ecloacae': 'Enterobacter cloacae',
+        'efaecium': 'Enterococcus faecium',
+        'lmonocytogenes': 'Listeria monocytogenes',
+        'mabscessus': 'Mycobacterium abscessus',
+        'mycobacteria': 'Mycobacterium sp.',
+        'paeruginosa': 'Pseudomonas aeruginosa',
+        'proteus': 'Proteus sp.',
+        'serratia': 'Serratia sp.'
     }
 
 
@@ -377,14 +370,12 @@ def main():
             columns={v: k for k, v in rename_map_gva.items()}, inplace=True
         )
         
-        # Convertir nombres de especies (aplicar a ID_WGS y ESPECIE_SECUENCIA)
+        # Convertir nombres de especies (aplicar solo a ID_WGS)
         if "ID_WGS" in df_merged.columns:
             df_merged["ID_WGS"] = df_merged["ID_WGS"].apply(convert_species_name)
             logger.info("Nombres de especies convertidos en ID_WGS")
         
-        if "ESPECIE_SECUENCIA" in df_merged.columns:
-            df_merged["ESPECIE_SECUENCIA"] = df_merged["ESPECIE_SECUENCIA"].apply(convert_species_name)
-            logger.info("Nombres de especies convertidos en ESPECIE_SECUENCIA")
+        # ESPECIE_SECUENCIA mantiene su valor original del samplesheet
         
         # Generar resumen de plásmidos
         logger.info("Generando resumen de plásmidos...")
