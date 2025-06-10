@@ -6,7 +6,7 @@ This script provides a command-line interface to run
 the EPIBAC pipeline, facilitating installation, validation, and analysis.
 
 Author: Alejandro Sanz-Carbonell
-Version: 1.1.0
+Version: 1.2.1
 Date: 2025
 """
 
@@ -21,8 +21,10 @@ import yaml
 from datetime import datetime
 from pathlib import Path
 
+print(yaml.__file__)
+
 # Basic configuration
-VERSION = "1.0.0"
+VERSION = "1.2.1"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 WORKFLOW_DIR = SCRIPT_DIR / "workflow"
 SNAKEFILE = WORKFLOW_DIR / "Snakefile"

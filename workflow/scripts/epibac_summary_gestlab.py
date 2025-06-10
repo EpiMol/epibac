@@ -110,8 +110,16 @@ def generate_plasmid_summary(sample_id, plasmids_file, logger):
         logger.info(f"Columnas: {list(df_plasmids.columns)}")
         logger.info(f"Sample_IDs disponibles: {df_plasmids['Sample_ID'].tolist()}")
         
-        # Buscar la muestra específica
-        sample_data = df_plasmids[df_plasmids['Sample_ID'] == str(sample_id)]
+        # Convertir sample_id a string para la comparación
+        sample_id_str = str(sample_id)
+        logger.info(f"Buscando sample_id: '{sample_id_str}' (tipo: {type(sample_id)})")
+        
+        # Buscar la muestra específica - comparar tanto como string como entero
+        sample_data = df_plasmids[
+            (df_plasmids['Sample_ID'] == sample_id_str) | 
+            (df_plasmids['Sample_ID'] == sample_id) |
+            (df_plasmids['Sample_ID'].astype(str) == sample_id_str)
+        ]
         logger.info(f"Filas encontradas para '{sample_id}': {len(sample_data)}")
         
         if len(sample_data) == 0:
@@ -188,7 +196,7 @@ def build_path(row, config, tag_run):
     storage_cabinet = (
         config.get("mode_config", {})
         .get("gva", {})
-        .get("storage_cabinet", "/home/asanzc/CABINAX/CabinaCS/NLSAR/deposit")
+        .get("storage_cabinet", "/mnt/CabinaCS/NLSAR/deposit")
     )
     hosp = parts[1][:4]  # Primeros 4 caracteres del segundo segmento
     
@@ -421,7 +429,7 @@ def main():
         df_merged["VERIFICACION_WGS"] = "ND"
         
         # Generar ruta para FICHERO_ANALISIS_WGS
-        analysis_file_path = f"epibac/output/{tag_run}/report/{tag_run}_EPIBAC.tsv"
+        analysis_file_path = f"epibac/output/{tag_run}/report/{tag_run}_EPIBAC_GESTLAB.csv"
         df_merged["FICHERO_ANALISIS_WGS"] = analysis_file_path
         
         # Eliminar las columnas especificadas del archivo final

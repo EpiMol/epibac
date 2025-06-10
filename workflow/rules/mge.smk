@@ -3,7 +3,7 @@ rule epibac_platon:
     """Análisis de plásmidos con Platon"""
     input:
         fasta=f"{OUTDIR}/assembly/{{sample}}/{{sample}}.fasta",
-        platon_db="resources/databases/platon/db",
+        platon_db=f"{PLATON_DB_DIR}/db",
         flag=PLATON_DB_FLAG
     output:
         tsv=f"{OUTDIR}/mge_analysis/plasmids/platon/{{sample}}/{{sample}}.tsv",

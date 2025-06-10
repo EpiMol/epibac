@@ -437,8 +437,8 @@ def process_platon_data(platon_base_path: str, min_length: int = 2000) -> pd.Dat
     """
     logging.info(f"Procesando datos de Platon desde: {platon_base_path}")
     
-    # Buscar archivos JSON de Platon
-    json_pattern = os.path.join(platon_base_path, "**", "EPI*.json")
+    # Buscar archivos JSON de Platon - patrón corregido para cualquier nombre .json
+    json_pattern = os.path.join(platon_base_path, "**", "*.json")
     json_files = glob.glob(json_pattern, recursive=True)
     
     if not json_files:
@@ -501,17 +501,25 @@ def process_mob_suite_data(mob_suite_base_path: str) -> pd.DataFrame:
     # Procesar todos los archivos de MOB-suite
     all_plasmids_list = []
     for filepath in sorted(mob_files):
-        # Extraer sample_id del path
+        # Extraer sample_id del path - corregido para cualquier formato numérico
         path_parts = filepath.split(os.sep)
         sample_id = None
+        
+        # Buscar en el path un directorio que parezca un sample_id
         for part in reversed(path_parts):
-            if part.startswith('EPI'):
+            # Buscar directorios que sean números o que contengan caracteres alfanuméricos
+            if re.match(r'^[0-9]+[A-Za-z0-9_-]*$', part) or re.match(r'^[A-Za-z]+[0-9]+.*$', part):
                 sample_id = part
                 break
         
         if not sample_id:
-            logging.warning(f"No se pudo extraer sample_id de {filepath}")
-            continue
+            # Si no encontramos un patrón, usar el directorio padre del archivo
+            parent_dir = os.path.basename(os.path.dirname(filepath))
+            if parent_dir and parent_dir != 'mob_suite':
+                sample_id = parent_dir
+            else:
+                logging.warning(f"No se pudo extraer sample_id de {filepath}")
+                continue
             
         logging.info(f"Procesando MOB-suite para muestra: {sample_id}")
         
