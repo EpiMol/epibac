@@ -257,6 +257,8 @@ El fichero `samplesinfo.csv` debe tener el siguiente formato:
 ```bash
 CODIGO_MUESTRA_ORIGEN;PETICION;FECHA_TOMA_MUESTRA;ESPECIE_SECUENCIA;MOTIVO_WGS;NUM_BROTE;CONFIRMACION;COMENTARIO_WGS;ILLUMINA_R1;ILLUMINA_R2;NANOPORE;MODELO_DORADO
 234512;90000001;2025-03-11;Klebsiella pneumoniae;VIGILANCIA;;;;/FULL/PATH/data/250425_GRAL001/fastq/234512_S45_R1_001.fastq.gz;/FULL/PATH/data/250425_GRAL001/fastq/234512_S45_R2_001.fastq.gz;;
+234518;90000002;2025-03-11;Escherichia coli;VIGILANCIA;;;;/FULL/PATH/data/250425_GRAL001/fastq/234518_S48_R1_001.fastq.gz;/FULL/PATH/data/250425_GRAL001/fastq/234518_S48_R2_001.fastq.gz;;
+234656;90000003;2025-03-11;Pseudomonas putida;VIGILANCIA;;;;/FULL/PATH/data/250425_GRAL001/fastq/234656_S69_R1_001.fastq.gz;/FULL/PATH/data/250425_GRAL001/fastq/234656_S69_R2_001.fastq.gz;;
 ```
 
 ### Descripción de las Columnas
@@ -321,25 +323,43 @@ Este ejemplo descarga y analiza 3 muestras desde Zenodo.
 # Definimos variables
 RUN="250425_GRAL001"
 EPIBAC_PATH=~/epibac
-DATA_DIR="<span class="math-inline">\{EPIBAC\_PATH\}/data"
-ZIP\_URL\="\[https\://zenodo\.org/records/15633357/files/250425\_GRAL001\.zip\]\(https\://zenodo\.org/records/15633357/files/250425\_GRAL001\.zip\)"
-ZIP\_FILE\="</span>{DATA_DIR}/<span class="math-inline">\{RUN\}\.zip"
-SAMPLESINFO\="</span>{DATA_DIR}/<span class="math-inline">\{RUN\}/samplesinfo\_</span>{RUN}.csv"
+DATA_DIR="${EPIBAC_PATH}/data"
+ZIP_URL="https://zenodo.org/records/15633357/files/250425_GRAL001.zip"
+ZIP_FILE="${DATA_DIR}/${RUN}.zip"
+SAMPLESINFO="${DATA_DIR}/${RUN}/samplesinfo_${RUN}.csv"
 
-# Creamos el directorio si no existe y descargamos
+# Creamos el directorio si no existe
 mkdir -p ${DATA_DIR}
+
+# Descargamos el set de ejemplo
 wget -O ${ZIP_FILE} ${ZIP_URL}
+
+# Descomprimimos dentro de data/
 unzip -o ${ZIP_FILE} -d ${DATA_DIR}
+
+# Eliminamos fichero descargado
 rm ${ZIP_FILE}
 
-# Entramos al directorio del pipeline y activamos conda
-cd <span class="math-inline">\{EPIBAC\_PATH\}
+# Entramos al directorio del pipeline
+cd ${EPIBAC_PATH}
+
+# Activamos el entorno conda
 conda activate epibac
-\# Corregimos el path en el archivo samplesinfo
-sed \-i "s\|/FULL/PATH\|</span>(pwd)|g" "<span class="math-inline">\{SAMPLESINFO\}"
-\# Validamos y ejecutamos
-\./epibac\.py validate \-\-samples "</span>{SAMPLESINFO}" --outdir "output/<span class="math-inline">\{RUN\}"
-\./epibac\.py run \-\-conda \-\-threads 24 \-\-samples "</span>{SAMPLESINFO}" --outdir "output/<span class="math-inline">\{RUN\}" \-\-run\_name "</span>{RUN}" --resume
+
+# Corregimos el path en el archivo samples_info
+sed -i "s|/FULL/PATH|$(pwd)|g" "${SAMPLESINFO}"
+
+# Mostramos el contenido del archivo de metadatos
+cat ${SAMPLESINFO}
+
+# Validamos el archivo samplesinfo
+./epibac.py validate --samples "${SAMPLESINFO}" --outdir "output/${RUN}"
+
+# Si todo está bien, deberías ver:
+# "The sample file has been successfully validated!"
+
+# Ejecutamos el análisis de prueba
+./epibac.py run --conda --threads 24 --samples "${SAMPLESINFO}" --outdir "output/${RUN}" --run_name "${RUN}" --resume
 ```
 
 ### Borrar archivos temporales (Opcional)
