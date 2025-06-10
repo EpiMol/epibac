@@ -34,8 +34,8 @@ logs/*
 # Permitir archivos específicos en esas carpetas
 !output/.gitkeep
 !logs/.gitkeep
-!resources/setup_conda_singularity.sh
-!resources/setup_conda_singularity_v2.sh
+resources/setup_conda_singularity.sh
+resources/setup_conda_singularity_v2.sh
 
 # Ignorar por defecto todo en data
 data/*
@@ -45,6 +45,7 @@ data/*
 #!data/250319_ALIC001/**/
 #!data/250319_ALIC001/**/*.fastq.gz
 data/**/*.fastq.gz
+!data/.gitkeep
 
 # Ignorar pycache y binarios de Python
 **/__pycache__/
