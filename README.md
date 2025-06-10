@@ -39,7 +39,7 @@ Si no tiene Conda instalado, puede usar estos comandos para una instalación lim
 
 ```bash
 # Descargar Miniconda
-wget -q [https://repo.anaconda.com/miniconda/Miniconda3-py312_25.1.1-2-Linux-x86_64.sh](https://repo.anaconda.com/miniconda/Miniconda3-py312_25.1.1-2-Linux-x86_64.sh) -O ~/miniconda.sh
+wget -q https://repo.anaconda.com/miniconda/Miniconda3-py312_25.1.1-2-Linux-x86_64.sh -O ~/miniconda.sh
 
 # Instalación desatendida en ~/miniconda3
 bash ~/miniconda.sh -b -p ~/miniconda3
@@ -86,7 +86,7 @@ conda install -n base -c conda-forge mamba -y
 
 ```bash
 # Configurar proxy GVA (solo si es necesario)
-PROXY_URL="[http://proxy.san.gva.es:8080](http://proxy.san.gva.es:8080)"
+PROXY_URL="http://proxy.san.gva.es:8080"
 conda config --set proxy_servers.http $PROXY_URL
 conda config --set proxy_servers.https $PROXY_URL
 ```
@@ -170,14 +170,14 @@ conda activate epibac
 >
 > ```bash
 > mv epibac/ epibac_old/
-> git clone [https://github.com/EpiMol/epibac.git](https://github.com/EpiMol/epibac.git)
+> git clone https://github.com/EpiMol/epibac.git
 > cd epibac
 > ```
 
 Si es una **instalación nueva**, clone el repositorio:
 
 ```bash
-git clone [https://github.com/EpiMol/epibac.git](https://github.com/EpiMol/epibac.git)
+git clone https://github.com/EpiMol/epibac.git
 cd epibac
 ```
 
@@ -195,12 +195,10 @@ Este comando descargará y configurará todas las bases de datos necesarias.
 
 Es crucial modificar la ruta `storage_cabinet` en el fichero `config.yaml` para que EPIBAC pueda subir los resultados a la cabina de la Generalitat Valenciana.
 
-```bash
-#...
+```yaml
 mode_config:
   gva:
     storage_cabinet: "/mnt/CabinaCS/NLSAR/deposit"
-#...
 ```
 
 ---
@@ -254,11 +252,11 @@ Un nombre válido sería: `250319_ALIC001`.
 
 El fichero `samplesinfo.csv` debe tener el siguiente formato:
 
-```bash
+```csv
 CODIGO_MUESTRA_ORIGEN;PETICION;FECHA_TOMA_MUESTRA;ESPECIE_SECUENCIA;MOTIVO_WGS;NUM_BROTE;CONFIRMACION;COMENTARIO_WGS;ILLUMINA_R1;ILLUMINA_R2;NANOPORE;MODELO_DORADO
 234512;90000001;2025-03-11;Klebsiella pneumoniae;VIGILANCIA;;;;/FULL/PATH/data/250425_GRAL001/fastq/234512_S45_R1_001.fastq.gz;/FULL/PATH/data/250425_GRAL001/fastq/234512_S45_R2_001.fastq.gz;;
 234518;90000002;2025-03-11;Escherichia coli;VIGILANCIA;;;;/FULL/PATH/data/250425_GRAL001/fastq/234518_S48_R1_001.fastq.gz;/FULL/PATH/data/250425_GRAL001/fastq/234518_S48_R2_001.fastq.gz;;
-234656;90000003;2025-03-11;Pseudomonas putida;VIGILANCIA;;;;/FULL/PATH/data/250425_GRAL001/fastq/234656_S69_R1_001.fastq.gz;/FULL/PATH/data/250425_GRAL001/fastq/234656_S69_R2_001.fastq.gz;;
+234656;90000003;2025-03-11;Enterobacter cloacae;VIGILANCIA;;;;/FULL/PATH/data/250425_GRAL001/fastq/234656_S69_R1_001.fastq.gz;/FULL/PATH/data/250425_GRAL001/fastq/234656_S69_R2_001.fastq.gz;;
 ```
 
 ### Descripción de las Columnas
@@ -266,7 +264,28 @@ CODIGO_MUESTRA_ORIGEN;PETICION;FECHA_TOMA_MUESTRA;ESPECIE_SECUENCIA;MOTIVO_WGS;N
 -   **CODIGO_MUESTRA_ORIGEN:** Código único de la muestra.
 -   **PETICION:** Código de GestLab.
 -   **FECHA_TOMA_MUESTRA:** Fecha de recolección (`AAAA-MM-DD`).
--   **ESPECIE_SECUENCIA:** Nombre científico exacto (ej: `Klebsiella pneumoniae`).
+-   **ESPECIE_SECUENCIA:** Nombre científico exacto. Debe coincidir con una de las siguientes especies soportadas:
+    - `Acinetobacter baumannii`
+    - `Campylobacter jejuni`
+    - `Citrobacter freundii`
+    - `Enterobacter cloacae`
+    - `Enterococcus faecium`
+    - `Escherichia coli`
+    - `Klebsiella oxytoca`
+    - `Klebsiella pneumoniae`
+    - `Legionella pneumophila`
+    - `Listeria monocytogenes`
+    - `Mycobacterium abscessus`
+    - `Mycobacterium tuberculosis`
+    - `Neisseria gonorrhoeae`
+    - `Neisseria meningitidis`
+    - `Proteus mirabilis`
+    - `Pseudomonas aeruginosa`
+    - `Pseudomonas putida`
+    - `Salmonella enterica`
+    - `Serratia marcescens`
+    - `Staphylococcus aureus`
+    - `Stenotrophomonas maltophilia`
 -   **MOTIVO_WGS:** `VIGILANCIA` o `BROTE`.
 -   **NUM_BROTE:** Número de brote si aplica.
 -   **CONFIRMACION:** Información a confirmar por FISABIO.
@@ -290,7 +309,7 @@ RUN="250319_ALIC001"
 Crea una plantilla `samplesinfo.csv` a partir de un directorio de ficheros FASTQ.
 
 ```bash
-./epibac.py samplesinfo --run_name <span class="math-inline">\{RUN\} \-\-platform illumina \-\-fastq data/</span>{RUN}/fastq
+./epibac.py samplesinfo --run_name ${RUN} --platform illumina --fastq data/${RUN}/fastq
 ```
 
 ### Validar la plantilla de la carrera
@@ -298,7 +317,7 @@ Crea una plantilla `samplesinfo.csv` a partir de un directorio de ficheros FASTQ
 Una vez rellenada, valide la plantilla. Este paso es **obligatorio**.
 
 ```bash
-./epibac.py validate --samples data/<span class="math-inline">\{RUN\}/samplesinfo\_</span>{RUN}.csv --outdir output/${RUN}
+./epibac.py validate --samples data/${RUN}/samplesinfo_${RUN}.csv --outdir output/${RUN}
 ```
 
 ### Lanzar análisis
@@ -306,7 +325,7 @@ Una vez rellenada, valide la plantilla. Este paso es **obligatorio**.
 Se recomienda lanzar EPIBAC desde el directorio raíz del proyecto.
 
 ```bash
-./epibac.py run --conda --threads 24 --samples data/<span class="math-inline">\{RUN\}/samplesinfo\_</span>{RUN}.csv --outdir output/${RUN} --run_name ${RUN} --resume
+./epibac.py run --conda --threads 24 --samples data/${RUN}/samplesinfo_${RUN}.csv --outdir output/${RUN} --run_name ${RUN} --resume
 ```
 
 -   `--threads`: Número de hilos a usar.
@@ -317,7 +336,12 @@ Se recomienda lanzar EPIBAC desde el directorio raíz del proyecto.
 
 ### Ejemplo práctico: Análisis con 3 muestras de prueba
 
-Este ejemplo descarga y analiza 3 muestras desde Zenodo.
+Este ejemplo descarga y analiza 3 muestras desde Zenodo:
+- **Klebsiella pneumoniae** (234512)
+- **Escherichia coli** (234518)  
+- **Pseudomonas putida** (234656)
+
+Dataset disponible en: [https://zenodo.org/records/15633357](https://zenodo.org/records/15633357)
 
 ```bash
 # Definimos variables
