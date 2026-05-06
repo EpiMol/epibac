@@ -81,26 +81,82 @@ def validate_samples(samples_file, config, mode=None, verbose=False):
             return {"status": 3, "warnings": warnings, "errors": errors, 
                     "fatal_errors": fatal_errors, "validated_df": None}
     
-    # Load and detect file format
+    # Detect BOM (Byte Order Mark) - common issue with Excel on Windows
+    has_bom = False
     try:
+        with open(samples_file, 'rb') as f:
+            first_bytes = f.read(3)
+            if first_bytes == b'\xef\xbb\xbf':
+                has_bom = True
+                warnings.append(
+                    "The file contains a UTF-8 BOM (Byte Order Mark), typically added by Excel on Windows. "
+                    "This has been handled automatically, but consider saving the file with UTF-8 encoding "
+                    "without BOM to avoid potential issues."
+                )
+    except Exception:
+        pass  # If we can't detect BOM, continue normally
+
+    # Load and detect file format
+    # Use 'utf-8-sig' encoding to automatically handle BOM if present
+    encoding = 'utf-8-sig' if has_bom else 'utf-8'
+
+    # Try to detect the correct separator intelligently
+    df = None
+    separator = None
+
+    # Expected column names for GVA mode (for validation)
+    expected_gva_cols = ["CODIGO_MUESTRA_ORIGEN", "PETICION", "ESPECIE_SECUENCIA"]
+    # Expected column names for normal mode
+    expected_normal_cols = ["id"]
+
+    try:
+        # Try semicolon first
         try:
-            df = pd.read_csv(samples_file, sep=";", dtype=str)
-            separator = ";"
-            if verbose:
-                print(f"File loaded with separator: semicolon (;)")
+            df_test = pd.read_csv(samples_file, sep=";", dtype=str, encoding=encoding, nrows=0)
+            # Check if we got multiple columns (not just one giant column)
+            if len(df_test.columns) > 1:
+                # Check if expected columns exist
+                if mode == "gva":
+                    has_expected = any(col in df_test.columns for col in expected_gva_cols)
+                else:
+                    has_expected = any(col in df_test.columns for col in expected_normal_cols)
+
+                if has_expected or len(df_test.columns) > 3:  # Likely correct separator
+                    df = pd.read_csv(samples_file, sep=";", dtype=str, encoding=encoding)
+                    separator = ";"
+                    if verbose:
+                        print(f"File loaded with separator: semicolon (;)")
+                        if has_bom:
+                            print(f"ℹ️ UTF-8 BOM detected and handled automatically")
         except:
+            pass
+
+        # If semicolon didn't work, try comma
+        if df is None:
             try:
-                df = pd.read_csv(samples_file, sep=",", dtype=str)
-                separator = ","
-                if verbose:
-                    print(f"File loaded with separator: comma (,)")
+                df_test = pd.read_csv(samples_file, sep=",", dtype=str, encoding=encoding, nrows=0)
+                if len(df_test.columns) > 1:
+                    df = pd.read_csv(samples_file, sep=",", dtype=str, encoding=encoding)
+                    separator = ","
+                    if verbose:
+                        print(f"File loaded with separator: comma (,)")
+                        if has_bom:
+                            print(f"ℹ️ UTF-8 BOM detected and handled automatically")
             except Exception as e:
-                fatal_errors.append(f"Error loading sample file: {e}")
-                return {"status": 3, "warnings": warnings, "errors": errors, 
-                        "fatal_errors": fatal_errors, "validated_df": None}
+                if df is None:  # Both separators failed
+                    fatal_errors.append(f"Error loading sample file with both ; and , separators: {e}")
+                    return {"status": 3, "warnings": warnings, "errors": errors,
+                            "fatal_errors": fatal_errors, "validated_df": None}
+
+        # If still no dataframe, error
+        if df is None:
+            fatal_errors.append("Could not detect the correct separator (tried ; and ,)")
+            return {"status": 3, "warnings": warnings, "errors": errors,
+                    "fatal_errors": fatal_errors, "validated_df": None}
+
     except Exception as e:
         fatal_errors.append(f"Unexpected error processing the file: {e}")
-        return {"status": 3, "warnings": warnings, "errors": errors, 
+        return {"status": 3, "warnings": warnings, "errors": errors,
                 "fatal_errors": fatal_errors, "validated_df": None}
 
     # Verify columns based on the mode
@@ -224,6 +280,42 @@ def validate_samples(samples_file, config, mode=None, verbose=False):
     for i, sample_id in enumerate(validated_df["id"]):
         if invalid_chars_pattern.search(str(sample_id)):
             errors.append(f"Error in row {i+2}: ID '{sample_id}' contains invalid special characters")
+
+    # Check for duplicate IDs
+    duplicate_ids = validated_df[validated_df.duplicated(subset=["id"], keep=False)]
+    if not duplicate_ids.empty:
+        duplicate_groups = duplicate_ids.groupby("id")
+
+        # Check if duplicates are exact row duplicates
+        exact_duplicates = []
+        partial_duplicates = []
+
+        for sample_id, group in duplicate_groups:
+            if len(group) > 1:
+                # Check if all rows in the group are exactly the same
+                if group.duplicated(keep=False).all():
+                    exact_duplicates.append((sample_id, len(group)))
+                else:
+                    partial_duplicates.append((sample_id, len(group)))
+
+        # Handle exact duplicates (can be removed automatically)
+        if exact_duplicates:
+            duplicate_list = [f"{sid} ({count} times)" for sid, count in exact_duplicates]
+            warnings.append(
+                f"Found {len(exact_duplicates)} sample IDs with exact duplicate rows: {', '.join(duplicate_list)}. "
+                f"Duplicate rows have been automatically removed."
+            )
+            # Remove exact duplicates, keeping only the first occurrence
+            validated_df = validated_df.drop_duplicates(subset=None, keep='first')
+
+        # Handle partial duplicates (same ID but different data - this is an ERROR)
+        if partial_duplicates:
+            duplicate_list = [f"{sid} ({count} times)" for sid, count in partial_duplicates]
+            errors.append(
+                f"Found {len(partial_duplicates)} sample IDs with conflicting data: {', '.join(duplicate_list)}. "
+                f"Each sample ID must be unique or have identical data across all rows."
+            )
+
     # Verify existence of FASTQ files
     fastq_columns = [col for col in validated_df.columns 
                     if col in ["illumina_r1", "illumina_r2", "nanopore"]]
@@ -321,14 +413,16 @@ def validate_samples(samples_file, config, mode=None, verbose=False):
         status = 2  # Non-fatal errors
     elif warnings:
         status = 1  # Only warnings
-        
+
     return {
         "status": status,
         "warnings": warnings,
         "errors": errors,
         "fatal_errors": fatal_errors,
         "validated_df": validated_df,
-        "separator": separator if "separator" in locals() else ";"
+        "separator": ";",  # Always save with semicolon for consistency with EPIBAC standard
+        "has_bom": has_bom if "has_bom" in locals() else False,
+        "input_separator": separator if "separator" in locals() else ";"  # Track original separator for info
     }
 
 def print_validation_result(result, verbose=False):
@@ -392,8 +486,11 @@ def main():
     if args.output and result["status"] < 3 and result["validated_df"] is not None:
         try:
             os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
-            result["validated_df"].to_csv(args.output, index=False, sep=result["separator"])
+            # Save with UTF-8 encoding WITHOUT BOM to avoid future issues
+            result["validated_df"].to_csv(args.output, index=False, sep=result["separator"], encoding='utf-8')
             print(f"\nValidated file saved to: {args.output}")
+            if result.get("has_bom", False):
+                print(f"ℹ️ The BOM has been removed from the saved file")
         except Exception as e:
             print(f"\nError saving validated file: {e}")
     

@@ -118,6 +118,41 @@ rule setup_resfinder_database:
         touch {output.flag}
         """
 
+rule setup_rgi_database:
+  output:
+      flag=RGI_DB_FLAG,
+  log:
+      RGI_DB_LOG,
+  conda:
+      "../envs/epibac_rgi.yml"
+  params:
+      db_url=RGI_DB_URL,
+      db_dir=RGI_DB_DIR,
+  shell:
+      """
+      mkdir -p {params.db_dir}
+      mkdir -p $(dirname {log})
+
+      if [ ! -f "{params.db_dir}/card.json" ]; then
+          echo "[INFO] Descargando base de datos CARD para RGI desde {params.db_url}" &>> {log}
+          wget --no-check-certificate -O {params.db_dir}/card.tar.bz2 {params.db_url} &>> {log}
+
+          echo "[INFO] Descomprimiendo base de datos CARD..." &>> {log}
+          tar -xjf {params.db_dir}/card.tar.bz2 -C {params.db_dir} &>> {log}
+
+          echo "[INFO] Cargando base de datos en RGI..." &>> {log}
+          rgi load --card_json {params.db_dir}/card.json --local &>> {log}
+
+          echo "[INFO] Eliminando archivo .tar.bz2..." &>> {log}
+          rm -f {params.db_dir}/card.tar.bz2
+      else
+          echo "[INFO] La base de datos CARD ya está instalada, se omite la descarga." &>> {log}
+          # Asegurar que RGI tiene la DB cargada
+          rgi load --card_json {params.db_dir}/card.json --local &>> {log}
+      fi
+
+      touch {output.flag}
+      """
 
 rule metadata_prokka_database:
     input:

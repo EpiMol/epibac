@@ -99,6 +99,12 @@ RESFINDER_DB_DIR = f"{REFDIR}/databases/resfinder"
 RESFINDER_DB_FLAG = f"{RESFINDER_DB_DIR}/.installed.flag"
 RESFINDER_DB_LOG = f"{REFDIR}/databases/log/resfinder.log"
 
+# ----- RGI (CARD) -----
+RGI_DB_URL = config["params"]["rgi"].get("db_url", "https://card.mcmaster.ca/latest/data")
+RGI_DB_DIR = f"{REFDIR}/databases/rgi"
+RGI_DB_FLAG = f"{RGI_DB_DIR}/.installed.flag"
+RGI_DB_LOG = f"{REFDIR}/databases/log/rgi.log"
+
 # ----- PROKKA -----
 PROKKA_DB_DIR = f"{REFDIR}/databases/prokka"
 PROKKA_DB_FLAG = f"{PROKKA_DB_DIR}/.installed.flag"
@@ -131,9 +137,15 @@ def get_samples_safe():
     samples_csv = f"{LOGDIR}/samplesinfo/samplesinfo_validated.csv"
     if os.path.exists(samples_csv):
         use_column = config.get("primary_id_column", "id")
-        return pd.read_csv(samples_csv, sep=";", dtype=str).set_index(
-            use_column, drop=False
-        )
+        # Try to detect separator automatically
+        try:
+            df = pd.read_csv(samples_csv, sep=";", dtype=str, encoding='utf-8-sig')
+            if use_column not in df.columns and len(df.columns) == 1:
+                # Likely wrong separator, try comma
+                df = pd.read_csv(samples_csv, sep=",", dtype=str, encoding='utf-8-sig')
+        except:
+            df = pd.read_csv(samples_csv, sep=",", dtype=str, encoding='utf-8-sig')
+        return df.set_index(use_column, drop=False)
     else:
         return pd.DataFrame()  # Devuelve vacío, evita romper el flujo
 
@@ -151,9 +163,15 @@ def get_samples():
     samples_csv = f"{LOGDIR}/samplesinfo/samplesinfo_validated.csv"
     if os.path.exists(samples_csv):
         use_column = config.get("primary_id_column", "id")
-        return pd.read_csv(samples_csv, sep=";", dtype=str).set_index(
-            use_column, drop=False
-        )
+        # Try to detect separator automatically
+        try:
+            df = pd.read_csv(samples_csv, sep=";", dtype=str, encoding='utf-8-sig')
+            if use_column not in df.columns and len(df.columns) == 1:
+                # Likely wrong separator, try comma
+                df = pd.read_csv(samples_csv, sep=",", dtype=str, encoding='utf-8-sig')
+        except:
+            df = pd.read_csv(samples_csv, sep=",", dtype=str, encoding='utf-8-sig')
+        return df.set_index(use_column, drop=False)
     else:
         raise FileNotFoundError(
             f"El fichero validado '{samples_csv}' aún no existe. Ejecuta primero la regla 'validate_samples'."
@@ -170,7 +188,14 @@ def get_sample_index_if_exists():
     samples_csv = f"{LOGDIR}/samplesinfo/samplesinfo_validated.csv"
     if os.path.exists(samples_csv):
         use_column = config.get("primary_id_column", "id")
-        df = pd.read_csv(samples_csv, sep=";", dtype=str)
+        # Try to detect separator automatically
+        try:
+            df = pd.read_csv(samples_csv, sep=";", dtype=str, encoding='utf-8-sig')
+            if use_column not in df.columns and len(df.columns) == 1:
+                # Likely wrong separator, try comma
+                df = pd.read_csv(samples_csv, sep=",", dtype=str, encoding='utf-8-sig')
+        except:
+            df = pd.read_csv(samples_csv, sep=",", dtype=str, encoding='utf-8-sig')
         return df[use_column].tolist()
     else:
         return []
@@ -353,6 +378,12 @@ def get_all_inputs():
             for sample in sample_ids
         ])
         
+        
+# Agregar resultados de RGI (AMR detection)
+        inputs.extend([
+            f"{OUTDIR}/amr_mlst/rgi/{sample}_rgi.txt"
+            for sample in sample_ids
+        ])
         # Agregar análisis unificado de plásmidos
         inputs.extend([
             f"{OUTDIR}/mge_analysis/unified_plasmid_analysis/{TAG_RUN}_plasmid_analysis_summary.tsv",

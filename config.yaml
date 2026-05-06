@@ -48,7 +48,11 @@ params:
   resfinder:
     extra: "-l 0.6 -t 0.8 --acquired"
   kraken2:
-    db_url: "https://genome-idx.s3.amazonaws.com/kraken/k2_standard_08gb_20241228.tar.gz"
+    db_url: "https://genome-idx.s3.amazonaws.com/kraken/k2_standard_16_GB_20250714.tar.gz"
+    #db_url: https://genome-idx.s3.amazonaws.com/kraken/k2_minusb_20250714.tar.gz"
+  rgi:
+    db_url: "https://card.mcmaster.ca/latest/data"
+    extra: ""  # Parámetros adicionales opcionales: --low_quality, --include_loose, etc.  
 
 resources:
     default:
@@ -90,6 +94,10 @@ resources:
     amrfinder:
         threads: 4
         mem: 6000
+        walltime: 480
+    rgi:
+        threads: 6
+        mem: 8000
         walltime: 480
     mlst:
         threads: 4

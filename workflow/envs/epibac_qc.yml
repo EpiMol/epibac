@@ -9,12 +9,12 @@ dependencies:
   # Validación samples_info
   - pyyaml
   - pandas
-  - snakemake=9.1.1  
+  - snakemake=9.1.1
   # Control de calidad de secuencias
   - fastqc=0.12.1
   - nanoqc=0.10.0
   # Detección de contaminación y especie
-  - kraken2=2.14
+  - kraken2=2.1.6
   - kmerfinder=3.0.2
   # Filtrado y trimming
   - fastp=0.24.0

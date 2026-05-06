@@ -554,9 +554,13 @@ class EpibacRunner:
          report_file = os.path.join(logs_dir, "samplesvalidation_report.txt")
          
          try:
-          # Save validated file
-          result["validated_df"].to_csv(outfile, index=False, sep=result["separator"])
+          # Save validated file with UTF-8 encoding WITHOUT BOM
+          result["validated_df"].to_csv(outfile, index=False, sep=result["separator"], encoding='utf-8')
           self.logger.info(f"Validated file saved to: {outfile}")
+          if result.get("has_bom", False):
+              self.logger.info(f"ℹ️ UTF-8 BOM was detected and removed from the validated file")
+          if result.get("input_separator") == "," and result["separator"] == ";":
+              self.logger.info(f"ℹ️ File converted from comma (,) to semicolon (;) separator for EPIBAC standard format")
           
           # Save report
           with open(report_file, "w") as f:

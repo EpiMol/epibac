@@ -46,6 +46,47 @@ rule epibac_amr:
           > {output.tsv} 2> {log}
         """
 
+rule epibac_rgi:
+    input:
+        setup_db=RGI_DB_FLAG,  # Ahora está correctamente definido en common.smk
+        fasta=f"{OUTDIR}/assembly/{{sample}}/{{sample}}.fasta",
+    output:
+        txt=f"{OUTDIR}/amr_mlst/rgi/{{sample}}_rgi.txt",
+        json=f"{OUTDIR}/amr_mlst/rgi/{{sample}}_rgi.json",
+    log:
+        f"{LOGDIR}/rgi/{{sample}}.log",
+    threads: get_resource("rgi", "threads")
+    resources:
+        mem_mb=get_resource("rgi", "mem"),
+        walltime=get_resource("rgi", "walltime"),
+    params:
+        name=lambda wc: f"{wc.sample}",
+        out_prefix=lambda wc: f"{OUTDIR}/amr_mlst/rgi/{wc.sample}_rgi",
+        extra=lambda wc: config["params"]["rgi"].get("extra", ""),
+    conda:
+        "../envs/epibac_rgi.yml"
+    container:
+        "docker://alesanzdro/epibac_rgi:1.0"
+    shell:
+        r"""
+        # Verifica si el archivo FASTA es vacío o no
+        if [ ! -s {input.fasta} ]; then
+            echo "[ERROR] El archivo FASTA {input.fasta} está vacío" &> {log}
+            touch {output.txt}
+            touch {output.json}
+            exit 0
+        fi
+
+        # Ejecuta RGI
+        rgi main \
+            --input_sequence {input.fasta} \
+            --output_file {params.out_prefix} \
+            --input_type contig \
+            --num_threads {threads} \
+            --clean \
+            {params.extra} \
+            &> {log}
+        """
 
 rule epibac_resfinder:
     input:

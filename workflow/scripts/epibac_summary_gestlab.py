@@ -77,70 +77,148 @@ def convert_species_name(species_name):
     return "ND"
 
 
-def resumen_plasmidos(row, max_rep=8):
-    """Generar resumen de plásmidos usando los datos de una fila del DataFrame."""
-    try:
-        partes = [
-            f"{int(row['MOB_Suite_Num_Predicted_Plasmids_in_Sample'])} plasmids",
-            f"size={int(row['MOB_Suite_Total_Size_Predicted_Plasmids_in_Sample'])}bp"
-        ]
-        if pd.notna(row['Unique_rep_type']):
-            reps = [r.strip() for r in row['Unique_rep_type'].split(';') if r.strip()]
-            partes.append(f"rep={', '.join(reps[:max_rep])}{'...' if len(reps) > max_rep else ''}")
-        if pd.notna(row['Unique_predicted_mobility']):
-            partes.append(f"mobility={row['Unique_predicted_mobility']}")
-        return " | ".join(partes)
-    except Exception as e:
-        return "ND"
+def generate_plasmid_summary(sample_id, outdir, logger):
+    """
+    Generar resumen detallado de plásmidos leyendo el archivo MOB-suite individual.
 
-
-def generate_plasmid_summary(sample_id, plasmids_file, logger):
-    """Generar resumen de plásmidos para una muestra específica."""
+    Formato de salida:
+    plasmid_AA002: 87.6kb | conjugative | IncL/M | MOBP+MPF_I | K.pneumoniae(99.0%ANI) | AMRs: none
+    plasmid_AA038: 103.6kb | conjugative | IncFII+rep_2183 | MOBF+MPF_F | K.pneumoniae(96.7%ANI) | AMRs: blaTEM-1, aac(6')-Ib
+    """
     try:
         logger.info(f"=== Procesando plásmidos para muestra: {sample_id} ===")
-        
+
+        # Construir ruta al archivo MOB-suite individual
+        mob_file = os.path.join(outdir, "mge_analysis/plasmids/mob_suite", str(sample_id), "mobtyper_results.txt")
+        logger.info(f"Buscando archivo MOB-suite: {mob_file}")
+
         # Verificar que el archivo existe
-        if not os.path.exists(plasmids_file):
-            logger.warning(f"Archivo de plásmidos no encontrado: {plasmids_file}")
+        if not os.path.exists(mob_file):
+            logger.warning(f"Archivo MOB-suite no encontrado: {mob_file}")
             return "ND"
-        
-        # Leer archivo de plásmidos
-        df_plasmids = pd.read_csv(plasmids_file, sep="\t")
-        logger.info(f"Archivo de plásmidos cargado: {len(df_plasmids)} filas")
-        logger.info(f"Columnas: {list(df_plasmids.columns)}")
-        logger.info(f"Sample_IDs disponibles: {df_plasmids['Sample_ID'].tolist()}")
-        
-        # Convertir sample_id a string para la comparación
-        sample_id_str = str(sample_id)
-        logger.info(f"Buscando sample_id: '{sample_id_str}' (tipo: {type(sample_id)})")
-        
-        # Buscar la muestra específica - comparar tanto como string como entero
-        sample_data = df_plasmids[
-            (df_plasmids['Sample_ID'] == sample_id_str) | 
-            (df_plasmids['Sample_ID'] == sample_id) |
-            (df_plasmids['Sample_ID'].astype(str) == sample_id_str)
-        ]
-        logger.info(f"Filas encontradas para '{sample_id}': {len(sample_data)}")
-        
-        if len(sample_data) == 0:
-            logger.warning(f"No se encontraron datos de plásmidos para '{sample_id}'")
+
+        # Verificar que el archivo no está vacío
+        if os.path.getsize(mob_file) == 0:
+            logger.warning(f"Archivo MOB-suite vacío: {mob_file}")
             return "ND"
-        
-        # Obtener la primera fila (debería ser única por muestra)
-        row = sample_data.iloc[0]
-        logger.info(f"Datos encontrados: {dict(row)}")
-        
-        # Verificar si tiene plásmidos
-        num_plasmids = row.get('MOB_Suite_Num_Predicted_Plasmids_in_Sample', 0)
-        if pd.isna(num_plasmids) or num_plasmids == 0:
+
+        # Leer archivo MOB-suite (formato TSV con encabezado duplicado cada 2 filas)
+        # Estructura: header (línea 0), data (línea 1), header (línea 2), data (línea 3), ...
+        with open(mob_file, 'r') as f:
+            lines = f.readlines()
+
+        if len(lines) < 2:
+            logger.warning(f"Archivo MOB-suite con datos insuficientes: {mob_file}")
+            return "ND"
+
+        # Extraer header de la primera línea
+        header = lines[0].strip().split('\t')
+
+        # Extraer solo las filas de datos (líneas 1, 3, 5, 7, ...)
+        data_rows = []
+        for i in range(1, len(lines), 2):
+            data_rows.append(lines[i].strip().split('\t'))
+
+        # Crear DataFrame
+        df_plasmids = pd.DataFrame(data_rows, columns=header)
+        logger.info(f"Archivo MOB-suite procesado: {len(lines)} líneas, {len(df_plasmids)} plásmidos")
+
+        logger.info(f"Plásmidos encontrados: {len(df_plasmids)}")
+
+        if len(df_plasmids) == 0:
             logger.info(f"Muestra '{sample_id}' no tiene plásmidos predichos")
             return "ND"
-        
-        # Usar la función resumen_plasmidos directamente
-        summary = resumen_plasmidos(row)
-        logger.info(f"Resumen generado para '{sample_id}': {summary}")
-        return summary
-        
+
+        # Generar resumen para cada plásmido
+        plasmid_summaries = []
+
+        for idx, row in df_plasmids.iterrows():
+            plasmid_id = str(row['sample_id'])
+            size_bp = int(row['size'])
+            size_kb = size_bp / 1000.0
+
+            # Movilidad
+            mobility = str(row['predicted_mobility']).strip()
+
+            # Replicon types (Inc types y otros)
+            rep_types = []
+            if pd.notna(row['rep_type(s)']) and str(row['rep_type(s)']).strip() not in ['-', '']:
+                reps = str(row['rep_type(s)']).split(',')
+                rep_types = [r.strip() for r in reps if r.strip()]
+
+            # Relaxase y MPF types
+            mob_types = []
+            if pd.notna(row['relaxase_type(s)']) and str(row['relaxase_type(s)']).strip() not in ['-', '']:
+                relaxases = str(row['relaxase_type(s)']).split(',')
+                mob_types.extend([r.strip() for r in relaxases if r.strip()])
+
+            mpf_types = []
+            if pd.notna(row['mpf_type']) and str(row['mpf_type']).strip() not in ['-', '']:
+                mpfs = str(row['mpf_type']).split(',')
+                mpf_types = [m.strip() for m in mpfs if m.strip()]
+
+            # Combinar MOB y MPF (eliminar duplicados preservando orden)
+            mob_mpf = []
+            seen = set()
+            for item in mob_types + mpf_types:
+                if item not in seen:
+                    mob_mpf.append(item)
+                    seen.add(item)
+            mob_mpf_str = '+'.join(mob_mpf) if mob_mpf else 'none'
+
+            # Especie y ANI
+            species = str(row['mash_neighbor_identification']).strip()
+            # Simplificar nombre de especie
+            if 'Klebsiella pneumoniae' in species:
+                species_short = 'K.pneumoniae'
+            elif 'Escherichia coli' in species:
+                species_short = 'E.coli'
+            elif 'Pseudomonas aeruginosa' in species:
+                species_short = 'P.aeruginosa'
+            elif 'Acinetobacter baumannii' in species:
+                species_short = 'A.baumannii'
+            else:
+                # Usar primera letra del género + especie
+                parts = species.split()
+                if len(parts) >= 2:
+                    species_short = f"{parts[0][0]}.{parts[1]}"
+                else:
+                    species_short = species
+
+            # Calcular ANI (1 - mash_distance)
+            ani_pct = 0.0
+            if pd.notna(row['mash_neighbor_distance']):
+                try:
+                    mash_dist = float(row['mash_neighbor_distance'])
+                    ani_pct = (1 - mash_dist) * 100
+                except:
+                    ani_pct = 0.0
+
+            species_ani = f"{species_short}({ani_pct:.1f}%ANI)" if ani_pct > 0 else species_short
+
+            # Replicon types como string compacto
+            rep_str = '+'.join(rep_types) if rep_types else 'none'
+
+            # Construir resumen del plásmido (sin AMRs, ya que no los estamos evaluando por plásmido)
+            summary_parts = [
+                plasmid_id,
+                f"{size_kb:.1f}kb",
+                mobility,
+                rep_str,
+                mob_mpf_str,
+                species_ani
+            ]
+
+            plasmid_summary = " | ".join(summary_parts)
+            plasmid_summaries.append(plasmid_summary)
+            logger.info(f"  {plasmid_summary}")
+
+        # Unir todos los plásmidos con salto de línea
+        final_summary = "\n".join(plasmid_summaries)
+        logger.info(f"Resumen completo generado para '{sample_id}'")
+
+        return final_summary
+
     except Exception as e:
         logger.error(f"Error procesando plásmidos para '{sample_id}': {e}")
         import traceback
@@ -251,52 +329,215 @@ def create_excel_with_formatting(df, output_path, logger):
     try:
         # Limpiar DataFrame antes de escribir a Excel
         df_clean = clean_dataframe_for_excel(df, logger)
-        
+
         # Crear workbook y worksheet
         wb = Workbook()
         ws = wb.active
         ws.title = "GESTLAB_Report"
-        
+
         # Agregar datos al worksheet
         for r in dataframe_to_rows(df_clean, index=False, header=True):
             ws.append(r)
-        
+
         # Formatear la primera fila (encabezados)
         header_font = Font(bold=True, color="FFFFFF")
         header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")  # Azul clarito
-        
+
         for cell in ws[1]:
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        
+
         # Ajustar ancho de columnas automáticamente
         for column in ws.columns:
             max_length = 0
             column_letter = column[0].column_letter
-            
+
             for cell in column:
                 try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except:
                     pass
-            
+
             # Establecer ancho mínimo y máximo
             adjusted_width = min(max(max_length + 2, 10), 50)
             ws.column_dimensions[column_letter].width = adjusted_width
-        
+
         # Aplicar wrap text a todas las celdas
         for row in ws.iter_rows():
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
-        
+
         # Guardar archivo
         wb.save(output_path)
         logger.info(f"Archivo Excel guardado exitosamente en: {output_path}")
-        
+
     except Exception as e:
         logger.error(f"Error creando archivo Excel: {e}")
+        raise
+
+
+def create_plasmids_excel(samples_file, outdir, output_path, logger):
+    """
+    Crear archivo Excel detallado con información de plásmidos.
+
+    Columnas:
+    - Sample_ID
+    - Plasmid_ID
+    - Size_bp
+    - Size_kb
+    - Mobility
+    - Rep_types
+    - Relaxase_types
+    - MPF_types
+    - Species_match
+    - ANI_%
+    - Num_contigs
+    """
+    try:
+        logger.info("=== Generando Excel detallado de plásmidos ===")
+
+        # Leer archivo de muestras para obtener lista de IDs
+        df_samples = pd.read_csv(samples_file, sep=";")
+        # El archivo validated puede tener 'id' o 'CODIGO_MUESTRA_ORIGEN'
+        if 'id' in df_samples.columns:
+            sample_ids = df_samples['id'].tolist()
+        elif 'CODIGO_MUESTRA_ORIGEN' in df_samples.columns:
+            sample_ids = df_samples['CODIGO_MUESTRA_ORIGEN'].tolist()
+        else:
+            raise ValueError("No se encontró columna de ID de muestra ('id' o 'CODIGO_MUESTRA_ORIGEN')")
+
+        all_plasmid_data = []
+
+        for sample_id in sample_ids:
+            mob_file = os.path.join(outdir, "mge_analysis/plasmids/mob_suite", str(sample_id), "mobtyper_results.txt")
+
+            if not os.path.exists(mob_file) or os.path.getsize(mob_file) == 0:
+                continue
+
+            # Leer MOB-suite file
+            with open(mob_file, 'r') as f:
+                lines = f.readlines()
+
+            if len(lines) < 2:
+                continue
+
+            header = lines[0].strip().split('\t')
+            data_rows = []
+            for i in range(1, len(lines), 2):
+                data_rows.append(lines[i].strip().split('\t'))
+
+            df_plasmids = pd.DataFrame(data_rows, columns=header)
+
+            # Extraer información de cada plásmido
+            for idx, row in df_plasmids.iterrows():
+                plasmid_id = str(row['sample_id'])
+                size_bp = int(row['size'])
+                size_kb = round(size_bp / 1000.0, 1)
+                mobility = str(row['predicted_mobility']).strip()
+                num_contigs = int(row['num_contigs'])
+
+                # Rep types
+                rep_types = str(row['rep_type(s)']).strip()
+                if rep_types in ['-', '', 'nan']:
+                    rep_types = 'none'
+
+                # Relaxase types
+                relaxase_types = str(row['relaxase_type(s)']).strip()
+                if relaxase_types in ['-', '', 'nan']:
+                    relaxase_types = 'none'
+
+                # MPF types
+                mpf_types = str(row['mpf_type']).strip()
+                if mpf_types in ['-', '', 'nan']:
+                    mpf_types = 'none'
+
+                # Species and ANI
+                species = str(row['mash_neighbor_identification']).strip()
+                ani_pct = 0.0
+                if pd.notna(row['mash_neighbor_distance']):
+                    try:
+                        mash_dist = float(row['mash_neighbor_distance'])
+                        ani_pct = round((1 - mash_dist) * 100, 1)
+                    except:
+                        ani_pct = 0.0
+
+                plasmid_data = {
+                    'Sample_ID': sample_id,
+                    'Plasmid_ID': plasmid_id,
+                    'Size_bp': size_bp,
+                    'Size_kb': size_kb,
+                    'Mobility': mobility,
+                    'Rep_types': rep_types,
+                    'Relaxase_types': relaxase_types,
+                    'MPF_types': mpf_types,
+                    'Species_match': species,
+                    'ANI_%': ani_pct,
+                    'Num_contigs': num_contigs
+                }
+
+                all_plasmid_data.append(plasmid_data)
+
+        if len(all_plasmid_data) == 0:
+            logger.warning("No se encontraron plásmidos en ninguna muestra")
+            # Crear DataFrame vacío con columnas
+            df_plasmids_excel = pd.DataFrame(columns=[
+                'Sample_ID', 'Plasmid_ID', 'Size_bp', 'Size_kb', 'Mobility',
+                'Rep_types', 'Relaxase_types', 'MPF_types', 'Species_match', 'ANI_%', 'Num_contigs'
+            ])
+        else:
+            df_plasmids_excel = pd.DataFrame(all_plasmid_data)
+
+        # Crear Excel con formato
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Plasmids_Detail"
+
+        # Agregar datos
+        for r in dataframe_to_rows(df_plasmids_excel, index=False, header=True):
+            ws.append(r)
+
+        # Formatear encabezados
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        # Ajustar anchos de columna
+        column_widths = {
+            'A': 20,  # Sample_ID
+            'B': 18,  # Plasmid_ID
+            'C': 12,  # Size_bp
+            'D': 12,  # Size_kb
+            'E': 18,  # Mobility
+            'F': 25,  # Rep_types
+            'G': 20,  # Relaxase_types
+            'H': 20,  # MPF_types
+            'I': 25,  # Species_match
+            'J': 10,  # ANI_%
+            'K': 12   # Num_contigs
+        }
+
+        for col, width in column_widths.items():
+            ws.column_dimensions[col].width = width
+
+        # Wrap text en todas las celdas
+        for row in ws.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+        # Guardar
+        wb.save(output_path)
+        logger.info(f"Excel de plásmidos guardado: {output_path} ({len(all_plasmid_data)} plásmidos)")
+
+    except Exception as e:
+        logger.error(f"Error creando Excel de plásmidos: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
 
@@ -403,9 +644,9 @@ def main():
         if id_column:
             logger.info(f"Usando columna '{id_column}' para buscar plásmidos")
             logger.info(f"Valores en {id_column}: {df_merged[id_column].tolist()}")
-            
+
             df_merged["PLASMIDOS_WGS"] = df_merged[id_column].apply(
-                lambda sample_id: generate_plasmid_summary(sample_id, plasmids_file, logger)
+                lambda sample_id: generate_plasmid_summary(sample_id, outdir, logger)
             )
             logger.info(f"Resumen de plásmidos generado usando columna '{id_column}'")
         else:
@@ -454,15 +695,19 @@ def main():
         
         # Crear archivo Excel con formato
         create_excel_with_formatting(df_merged, output_excel, logger)
-        
+
+        # Crear Excel detallado de plásmidos
+        plasmids_excel_path = output_excel.replace("_GESTLAB.xlsx", "_Plasmids_Detail.xlsx")
+        create_plasmids_excel(validated_samples_info, outdir, plasmids_excel_path, logger)
+
         # Estadísticas
         logger.info("=== Estadísticas finales ===")
         logger.info(f"Total de muestras procesadas: {len(df_merged)}")
         logger.info(f"Columnas en el archivo final: {len(df_merged.columns)}")
         logger.info(f"Columnas: {list(df_merged.columns)}")
-        
+
         logger.info("=== Procesamiento completado exitosamente ===")
-        
+
     except Exception as e:
         logger.error(f"Error durante el procesamiento: {e}")
         raise
