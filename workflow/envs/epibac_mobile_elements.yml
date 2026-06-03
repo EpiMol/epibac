@@ -20,6 +20,7 @@ dependencies:
   - mob_suite=3.1.9
   - blast=2.16.0
   - biopython=1.85
+  - pandas=1.5.3 # mob_suite 3.1.9 usa el kwarg `line_terminator` retirado en pandas 2.0
   - abricate=1.0.1
   - perl-path-tiny
   
