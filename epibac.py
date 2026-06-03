@@ -7,7 +7,7 @@ the EPIBAC pipeline, facilitating installation, validation, and analysis.
 
 Author: Alejandro Sanz-Carbonell
 Version: 1.2.1
-Date: 2025
+Date: 2026-06-03
 """
 
 import os
@@ -24,7 +24,7 @@ from pathlib import Path
 print(yaml.__file__)
 
 # Basic configuration
-VERSION = "1.2.1"
+VERSION = "1.2.3"
 SCRIPT_DIR = Path(__file__).parent.absolute()
 WORKFLOW_DIR = SCRIPT_DIR / "workflow"
 SNAKEFILE = WORKFLOW_DIR / "Snakefile"
@@ -437,8 +437,15 @@ class EpibacRunner:
             self.logger.info(f"[DRY RUN] Command: {cmd_str}")
             return 0
         
+        # Aislar Snakemake (y los envs conda que orquesta) del user-site
+        # del usuario que lanza el pipeline. Sin esto, un `pip install --user`
+        # de pandas/numpy/etc. tiene prioridad sobre los paquetes del env conda
+        # de cada regla y rompe herramientas como mob_suite (que pinea pandas<2).
+        run_env = os.environ.copy()
+        run_env["PYTHONNOUSERSITE"] = "1"
+
         try:
-            result = subprocess.run(cmd, check=True)
+            result = subprocess.run(cmd, check=True, env=run_env)
             return result.returncode
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error executing Snakemake (code {e.returncode}):")

@@ -1,14 +1,15 @@
-# Documentación EPIBAC v.1.2.1
+# Documentación EPIBAC v.1.2.3
 
 ## Índice
 
 1.  [Link documentación y pipeline](#link-documentación-y-pipeline)
-2.  [Puesta a punto EPIBAC](#puesta-a-punto-epibac)
-3.  [Estructura de Carpetas](#estructura-de-carpetas)
-4.  [Nombre carrera / análisis al correr EPIBAC](#nombre-carrera--análisis-al-correr-epibac)
-5.  [Fichero metadatos INPUT ejemplo](#fichero-metadatos-input-ejemplo)
-6.  [Lanzar EPIBAC](#lanzar-epibac)
-7.  [Contacto](#contacto)
+2.  [Quickstart — uso rutinario](#quickstart--uso-rutinario)
+3.  [Puesta a punto EPIBAC](#puesta-a-punto-epibac)
+4.  [Estructura de Carpetas](#estructura-de-carpetas)
+5.  [Nombre carrera / análisis al correr EPIBAC](#nombre-carrera--análisis-al-correr-epibac)
+6.  [Fichero metadatos INPUT ejemplo](#fichero-metadatos-input-ejemplo)
+7.  [Lanzar EPIBAC](#lanzar-epibac)
+8.  [Contacto](#contacto)
 
 ---
 
@@ -19,9 +20,113 @@
 
 ---
 
-## 2. Puesta a punto EPIBAC
+## 2. Quickstart — uso rutinario
 
-Actualmente EPIBAC v.1.2.1 solo está disponible a través de **Conda**, por lo que no se podría ejecutar con Singularity.
+> Versión corta para uso rutinario en el hospital. Asume que ya ha completado la **Sección 3 — Puesta a punto EPIBAC** (instalación de Conda/Mamba, creación del entorno `epibac`, clonado del repositorio, descarga de bases de datos con `./epibac.py setup` y edición de `config.yaml`).
+>
+> Si no ha hecho la puesta a punto todavía, **vaya primero a la Sección 3** y vuelva aquí cuando termine.
+
+### Los 4 comandos para cada carrera
+
+Desde el directorio raíz del repositorio (`epibac/`), con el entorno ya activado (`conda activate epibac`):
+
+```bash
+# 1. Nombre de la carrera (formato obligatorio AAMMDD_HOSPXXX)
+RUN="260315_ALIC001"
+
+# 2. Generar plantilla de samplesheet a partir de los FASTQ (opcional pero útil)
+./epibac.py samplesinfo --run_name ${RUN} --platform illumina --fastq data/${RUN}/fastq
+
+# 3. Validar la samplesheet (OBLIGATORIO)
+./epibac.py validate --samples data/${RUN}/samplesinfo_${RUN}.csv --outdir output/${RUN}
+
+# 4. Lanzar el análisis
+./epibac.py run --conda --threads 24 \
+    --samples data/${RUN}/samplesinfo_${RUN}.csv \
+    --outdir output/${RUN} \
+    --run_name ${RUN} \
+    --resume
+```
+
+Cuando termine, los resultados estarán en `output/${RUN}/report/`.
+
+### Cómo se nombra una carrera (run_name)
+
+**Formato obligatorio** en modo GVA (por defecto):
+
+```
+AAMMDD_HOSPXXX
+```
+
+-   **AAMMDD** → año, mes y día con dos dígitos cada uno. Ej.: `260315` para 15-mar-2026.
+-   **HOSP** → 4 letras mayúsculas con el código del hospital. Códigos válidos:
+    `ALIC`, `CAST`, `ELCH`, `GRAL`, `PESE`, `CLIN`, `LAFE`, `EPIM`.
+-   **XXX** → contador de 3 dígitos del lote (`001`, `002`, …).
+
+**Ejemplos válidos:** `260315_ALIC001`, `260601_LAFE003`.
+
+Si se equivoca con el formato, el comando `validate` (paso 3) se lo dirá y no le dejará seguir.
+
+### Cómo tiene que ser la samplesheet
+
+**Dónde la pone** (dentro del repositorio):
+
+```
+epibac/
+└── data/
+    └── 260315_ALIC001/                          ← carpeta con el nombre del RUN
+        ├── fastq/                               ← aquí van TODOS los FASTQ
+        │   ├── muestra1_S1_L001_R1_001.fastq.gz
+        │   ├── muestra1_S1_L001_R2_001.fastq.gz
+        │   ├── muestra2_S2_L001_R1_001.fastq.gz
+        │   └── muestra2_S2_L001_R2_001.fastq.gz
+        └── samplesinfo_260315_ALIC001.csv       ← samplesheet (mismo nombre que el RUN)
+```
+
+El nombre del CSV es **`samplesinfo_${RUN}.csv`**, sin excepción.
+
+**Qué contiene:** CSV separado por comas (`,`) o punto y coma (`;`) — Excel suele guardar con `;`, ambos valen. Cabecera y al menos una fila por muestra. Columnas en modo GVA:
+
+| Columna | Obligatoria | Descripción |
+|---|---|---|
+| `CODIGO_MUESTRA_ORIGEN` | ✅ | Código único de la muestra (debe coincidir con el prefijo del FASTQ, p. ej. `muestra1_S1_L001`). |
+| `PETICION` | ✅ | Código GestLab. |
+| `FECHA_TOMA_MUESTRA` | recomendada | Fecha de recolección, formato `DD/MM/AAAA` o `AAAA-MM-DD`. |
+| `ESPECIE_SECUENCIA` | recomendada | Nombre científico exacto (lista completa en Sección 6). |
+| `MOTIVO_WGS` | recomendada | `VIGILANCIA` o `BROTE`. |
+| `NUM_BROTE` | opcional | Sólo si `MOTIVO_WGS=BROTE`. |
+| `CONFIRMACION` | opcional | Información a confirmar por FISABIO. |
+| `COMENTARIO_WGS` | opcional | Comentarios del laboratorio. |
+| `ILLUMINA_R1` | ✅ (si Illumina) | Ruta **completa** al FASTQ R1. |
+| `ILLUMINA_R2` | ✅ (si Illumina) | Ruta **completa** al FASTQ R2. |
+| `NANOPORE` | ✅ (si Nanopore) | Ruta al FASTQ Nanopore. Dejar vacía si sólo Illumina. |
+| `MODELO_DORADO` | opcional | Modelo de basecalling (`fast` / `hac` / `sup`), sólo Nanopore. |
+
+> **Importante:** Las rutas de `ILLUMINA_R1`, `ILLUMINA_R2`, `NANOPORE` deben ser **absolutas** (empezar por `/`), no relativas.
+
+**Ejemplo:**
+
+```csv
+CODIGO_MUESTRA_ORIGEN,PETICION,FECHA_TOMA_MUESTRA,ESPECIE_SECUENCIA,MOTIVO_WGS,NUM_BROTE,CONFIRMACION,COMENTARIO_WGS,ILLUMINA_R1,ILLUMINA_R2,NANOPORE,MODELO_DORADO
+muestra1_S1_L001,90000001,15/03/2026,Klebsiella pneumoniae,VIGILANCIA,,,,/home/usuario/epibac/data/260315_ALIC001/fastq/muestra1_S1_L001_R1_001.fastq.gz,/home/usuario/epibac/data/260315_ALIC001/fastq/muestra1_S1_L001_R2_001.fastq.gz,,
+muestra2_S2_L001,90000002,15/03/2026,Escherichia coli,VIGILANCIA,,,,/home/usuario/epibac/data/260315_ALIC001/fastq/muestra2_S2_L001_R1_001.fastq.gz,/home/usuario/epibac/data/260315_ALIC001/fastq/muestra2_S2_L001_R2_001.fastq.gz,,
+```
+
+> **Truco:** El comando 2 (`./epibac.py samplesinfo …`) genera esta tabla automáticamente con las rutas ya rellenas. Sólo tendrá que completar especie, fecha y motivo.
+
+### ¿Algo falló?
+
+-   **`validate` se queja del formato del `run_name`** → revise que sigue exactamente `AAMMDD_HOSPXXX` con código de hospital válido.
+-   **`validate` se queja de columnas que faltan** → mire la tabla de arriba, las marcadas con ✅ son obligatorias.
+-   **`validate` se queja de la ruta de un FASTQ** → asegúrese de que es ruta absoluta y que el fichero existe (`ls /la/ruta/al/fastq.gz`).
+-   **El `run` se interrumpió y quiero retomar** → vuelva a lanzar el mismo comando, `--resume` continúa donde se quedó.
+-   **Cualquier otra cosa** → revise los logs en `output/${RUN}/logs/` y abra una incidencia en [GitHub](https://github.com/EpiMol/epibac/issues).
+
+---
+
+## 3. Puesta a punto EPIBAC
+
+Actualmente EPIBAC v.1.2.3 solo está disponible a través de **Conda**, por lo que no se podría ejecutar con Singularity.
 
 > #### Opciones de instalación
 >
@@ -203,7 +308,7 @@ mode_config:
 
 ---
 
-## 3. Estructura de Carpetas
+## 4. Estructura de Carpetas
 
 ```bash
 epibac/
@@ -231,7 +336,7 @@ epibac/
 
 ---
 
-## 4. Nombre carrera / análisis al correr EPIBAC
+## 5. Nombre carrera / análisis al correr EPIBAC
 
 EPIBAC tiene dos modos de funcionamiento:
 
@@ -248,7 +353,7 @@ Un nombre válido sería: `250319_ALIC001`.
 
 ---
 
-## 5. Fichero metadatos INPUT ejemplo
+## 6. Fichero metadatos INPUT ejemplo
 
 El fichero `samplesinfo.csv` debe tener el siguiente formato:
 
@@ -296,7 +401,7 @@ CODIGO_MUESTRA_ORIGEN;PETICION;FECHA_TOMA_MUESTRA;ESPECIE_SECUENCIA;MOTIVO_WGS;N
 
 ---
 
-## 6. Lanzar EPIBAC
+## 7. Lanzar EPIBAC
 
 ### Definir el nombre de la carrera
 
@@ -394,7 +499,7 @@ cat ${SAMPLESINFO}
 
 ---
 
-## 7. Contacto
+## 8. Contacto
 
 Para cualquier duda contactar con:
 

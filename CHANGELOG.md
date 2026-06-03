@@ -1,5 +1,69 @@
 # Changelog
 
+## [1.2.3] - 2026-06-03
+
+### Fixed
+- `mob_suite=3.1.9` no longer breaks the creation of the `epibac_amr_annotation`
+  env because we pin `biopython=1.81` (required for `gc_fraction`, added in
+  Biopython ≥ 1.80).
+- `mob_suite=3.1.9` no longer fails at runtime with
+  `TypeError: NDFrame.to_csv() got an unexpected keyword argument 'line_terminator'`
+  because we pin `pandas=1.5.3` in the 3 envs that use mob_suite
+  (`epibac_amr_annotation`, `epibac_mge_mob_suite`, `epibac_mobile_elements`).
+  The kwarg was removed in pandas 2.0.
+- `epibac.py` now launches Snakemake with `PYTHONNOUSERSITE=1`. This isolates the
+  conda envs from the operator's `~/.local/lib/pythonX.Y/site-packages/`, preventing
+  a `pip install --user` (e.g. `pandas-2.0.1`) from silently overriding the
+  packages pinned in each rule's yml.
+
+### Documentation
+- README: new Section 2 "Quickstart — routine use" for hospital staff,
+  with the 4 commands for each run, run naming, and samplesheet format.
+
+## [1.2.2] - 2026-05-06
+
+> Backfilled retroactively — the tag was created without a CHANGELOG entry.
+
+### Added
+- RGI (CARD) AMR detection: new conda env (`epibac_rgi.yml`), `setup_rgi_database`
+  rule, `epibac_rgi` analysis rule, config params/resources, and inclusion in
+  pipeline outputs via `get_all_inputs()`.
+
+### Changed
+- Kraken2 standard DB URL updated to the 16 GB / 2025-07-14 build.
+- `kraken2` pinned to `2.1.6` in the QC env.
+- `epibac_summary_gestlab.py`: plasmid summary rewritten to read per-sample
+  MOB-suite `mobtyper_results.txt` and produce detailed per-plasmid lines;
+  added companion `*_Plasmids_Detail.xlsx` report.
+
+### Fixed
+- `validate_samples_file.py`: detect and strip UTF-8 BOM (Excel-on-Windows),
+  smarter `;` vs `,` separator detection, and duplicate sample-ID handling.
+  Always save the validated CSV as UTF-8 without BOM.
+- `epibac.py` / `common.smk`: write validated CSV without BOM and auto-detect
+  the separator when reloading it downstream.
+
+## [1.2.1] - 2025-06-10
+
+> Backfilled retroactively — the tag was created without a CHANGELOG entry.
+
+### Fixed
+- Platon results capture: dynamic variables instead of hardcoded paths for the
+  Platon database, and corrected JSON file pattern matching in
+  `unified_plasmid_analysis.py` so all `.json` files are found.
+- Numeric sample IDs (e.g. `234512`, `234518`, `234656`) now work end-to-end:
+  sample-ID extraction logic improved, and int-vs-string comparison fixed in
+  the GESTLAB report generator.
+- MOB-suite and Platon integration no longer fail for numeric-only sample IDs.
+
+### Documentation
+- README cleanup: removed malformed HTML and "Copiar" buttons left over from
+  browser copy-paste, all links converted to proper Markdown.
+- Added the complete list of 21 supported bacterial species under
+  `ESPECIE_SECUENCIA`.
+- Practical example: show all 3 samples (`234512`, `234518`, `234656`) and
+  point to the Zenodo dataset `250425_GRAL001`.
+
 ## [1.2.0] - 2025-06-06
 
 ### Enhanced MLST Analysis

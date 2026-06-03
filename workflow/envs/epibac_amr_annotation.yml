@@ -15,6 +15,8 @@ dependencies:
   - plasmidfinder=2.1.6
   - platon=1.7
   - mob_suite=3.1.9 # Replicones plasmídicos
+  - biopython=1.81 # mob_suite 3.1.9 requiere gc_fraction (Biopython >=1.80)
+  - pandas=1.5.3 # mob_suite 3.1.9 usa el kwarg `line_terminator` retirado en pandas 2.0
   # Tipificación (MLST, etc.)
   - mlst=2.23.0
   - sistr_cmd=1.1.1  # para Salmonella
